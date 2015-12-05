@@ -43,19 +43,25 @@
               (>= c 2) (assoc :middle middle)))))
 
 (defn add-contact [data owner]
-  (let [input-el (om/get-node owner "new-contact")
-        new-contact (-> input-el
+  (let [new-contact (-> (om/get-node owner "new-contact")
                         .-value
                         parse-contact)]
     (when new-contact
       (om/transact! data :contacts #(conj % new-contact))
-      (set! (.-value input-el) ""))))
+      (om/set-state! owner :text ""))))
+
+(defn handle-change [e owner {:keys [text]}]
+  (let [value (.. e -target -value)]
+    (if-not (re-find #"[0-9]" value)
+      (om/set-state! owner :text value)
+      (om/set-state! owner :text text))))
 
 (defn contacts-view [data owner]
   (reify
     om/IInitState
     (init-state [_]
-                {:delete (chan)})
+                {:delete (chan)
+                 :text ""})
     om/IWillMount
     (will-mount [_]
                 (let [delete (om/get-state owner :delete)]
@@ -65,14 +71,15 @@
                                         (fn [xs] (vec (remove #(= contact %) xs))))
                           (recur))))))
     om/IRenderState
-    (render-state [this {:keys [delete]}]
+    (render-state [this state]
             (dom/div nil
                      (dom/h2 nil "Contact List")
                      (apply dom/ul nil
                             (om/build-all contact-view (:contacts data)
-                                          {:init-state {:delete delete}}))
+                                          {:init-state {:delete (:delete state)}}))
                      (dom/div nil
-                              (dom/input #js {:type "text" :ref "new-contact"})
+                              (dom/input #js {:type "text" :ref "new-contact" :value (:text state)
+                                              :onChange #(handle-change % owner state)})
                               (dom/button #js {:onClick #(add-contact data owner)} "Add Contact"))))))
 
 (om/root contacts-view app-state
