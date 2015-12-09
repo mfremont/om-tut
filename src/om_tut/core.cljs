@@ -1,11 +1,13 @@
 (ns ^:figwheel-always om-tut.core
+  (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
+            [cljs.core.async :refer [put! chan <!]]
             [clojure.string :as string]))
 
 (enable-console-print!)
 
-(def app-state
+(defonce app-state
   (atom
     {:people
      [{:type :student :first "Ben" :last "Bitdiddle" :email "benb@mit.edu"}
@@ -24,19 +26,11 @@
 
 (defn middle-name [{:keys [middle middle-initial]}]
   (cond
-    middle (str " " middle)
-    middle-initial (str " " middle-initial ".")))
+     middle (str " " middle)
+     middle-initial (str " " middle-initial ".")))
 
 (defn display-name [{:keys [first last] :as contact}]
   (str last ", " first (middle-name contact)))
-
-(defmulti entry-view (fn [person _] (:type person)))
-
-(defmethod entry-view :student [person owner]
-  (student-view person owner))
-
-(defmethod entry-view :professor [person owner]
-  (professor-view person owner))
 
 (defn student-view [student owner]
   (reify
@@ -54,6 +48,14 @@
                     (apply dom/ul nil
                            (map #(dom/li nil %) (:classes professor)))))))
 
+(defmulti entry-view (fn [person _] (:type person)))
+
+(defmethod entry-view :student [person owner]
+  (student-view person owner))
+
+(defmethod entry-view :professor [person owner]
+  (professor-view person owner))
+
 (defn people [data]
   (->> data
        :people
@@ -68,9 +70,9 @@
     om/IRender
     (render [_]
       (dom/div #js {:id "registry"}
-        (dom/h2 nil "Registry")
-        (apply dom/ul nil
-               (om/build-all entry-view (people data)))))))
+                    (dom/h2 nil "Registry")
+                    (apply dom/ul nil
+                      (om/build-all entry-view (people data)))))))
 
 (om/root registry-view app-state
   {:target (. js/document (getElementById "registry"))})
